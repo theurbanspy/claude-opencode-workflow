@@ -32,6 +32,9 @@ set -u
 set -o pipefail
 
 MODEL="${OC_WORKER_MODEL:-opencode-go/deepseek-v4.1-flash}"   # exact id; see README.md
+# Reasoning variant. deepseek-v4.1-flash on OpenCode Go accepts: default, low, high, max
+# (checked 2026-10-20; medium/xhigh are refused). max = highest reasoning effort.
+VARIANT="${OC_WORKER_VARIANT:-max}"
 AGENT="ocworker"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG="$HERE/worker-config.json"
@@ -232,7 +235,7 @@ run_once() {
         select(undef, undef, undef, 0.5);
       }
     ' "$TIMEOUT" "$STARTUP_GRACE" "$RUN/events.jsonl" "$OPENCODE_BIN" run --standalone --auto \
-        --agent "$AGENT" -m "$MODEL" --format json \
+        --agent "$AGENT" -m "$MODEL#$VARIANT" --format json \
         --title "oc-worker: $LABEL" \
         ${ATTACH[@]+"${ATTACH[@]}"} \
         -- "$(cat "$PROMPT_FILE")"
@@ -286,6 +289,10 @@ MODELS_USED="unknown"
 if [ -n "$SESSION" ]; then
   oc_neutral session export "$SESSION" --sanitize > "$RUN/session.json" 2>/dev/null || true
   MODELS_USED="$(jq -r '[.. | objects | select(has("providerID") and has("id") and (.id|type=="string")) | "\(.providerID)/\(.id)"] | unique | join(",")' "$RUN/session.json" 2>/dev/null || echo unknown)"
+  VARIANTS_USED="$(jq -r '[.. | objects | select(has("providerID") and has("variant")) | .variant] | unique | join(",")' "$RUN/session.json" 2>/dev/null || echo unknown)"
+  if [ -n "$VARIANTS_USED" ] && [ "$VARIANTS_USED" != "unknown" ] && [ "$VARIANTS_USED" != "$VARIANT" ]; then
+    MODELS_USED="$MODELS_USED (variant $VARIANTS_USED, expected $VARIANT)"
+  fi
   rm -f "$RUN/session.json"   # transcript content stays in events.jsonl only
   if [ -n "$MODELS_USED" ] && [ "$MODELS_USED" != "unknown" ] && [ "$MODELS_USED" != "$MODEL" ]; then
     STATUS="MODEL-MISMATCH"; CODE=6
@@ -342,8 +349,8 @@ STATUS: $STATUS
 WORKER SAYS: ${WORKER_STATUS:-no report}   (done | partial | blocked — exit 0 does not mean done)
 EXIT: $CODE (opencode rc=$RC)
 DURATION: ${DURATION}s
-MODEL REQUESTED: $MODEL
-MODELS ANSWERED: ${MODELS_USED:-unknown}
+MODEL REQUESTED: $MODEL (variant $VARIANT)
+MODELS ANSWERED: ${MODELS_USED:-unknown} (variant ${VARIANTS_USED:-unknown})
 SESSION: ${SESSION:-none}
 REPO: $REPO
 PRE-EXISTING STASH COMMIT: ${PRE_STASH:-none}   (restore: git stash apply <sha>)

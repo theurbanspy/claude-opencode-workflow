@@ -61,6 +61,7 @@ R=$(fresh ph); MARK="$T/hijack-mark"; rm -f "$MARK"
 ( cd "$R" && HIJACK_MARK="$MARK" OC_WORKER_OPENCODE_BIN="$STUB" STUB_MODE=pyhijack "$W" --repo . --task "$TASK" --runs-dir "$RUNS" >/dev/null 2>&1 )
 [ -e "$MARK" ] && bad "planted hashlib.py was imported by the launcher" || ok "planted Python module never imported (python3 -I)"
 R=$(fresh cc); OC_WORKER_OPENCODE_BIN="$STUB" STUB_MODE=ctrlname "$W" --repo "$R" --task "$TASK" --runs-dir "$RUNS" >/dev/null 2>&1; expect "control character in a file name → safety violation" 7 $?
+R=$(fresh vm); OC_WORKER_OPENCODE_BIN="$STUB" STUB_EXPORT_VARIANT=low "$W" --repo "$R" --task "$TASK" --runs-dir "$RUNS" >/dev/null 2>&1; expect "wrong reasoning variant → model mismatch" 6 $?
 R=$(fresh g); OC_WORKER_OPENCODE_BIN="$STUB" STUB_MODE=crash "$W" --repo "$R" --task "$TASK" --runs-dir "$RUNS" >/dev/null 2>&1; expect "worker crash" 5 $?
 R=$(fresh h); OC_WORKER_OPENCODE_BIN="$STUB" STUB_MODE=error "$W" --repo "$R" --task "$TASK" --runs-dir "$RUNS" >/dev/null 2>&1; expect "provider error (quota)" 4 $?
 R=$(fresh i); OC_WORKER_OPENCODE_BIN="$STUB" STUB_MODE=sleep "$W" --repo "$R" --task "$TASK" --runs-dir "$RUNS" --timeout 3 >/dev/null 2>&1; expect "wall-clock timeout" 124 $?
@@ -78,7 +79,7 @@ if [ "$LIVE" = 1 ]; then
   R=$(fresh live1); out="$("$W" --repo "$R" --task "$TASK" --runs-dir "$RUNS" --timeout 300 2>&1)"; rc=$?
   expect "live task" 0 $rc
   [ "$rc" = 0 ] || printf '%s\n' "$out" | grep -E '^(STATUS|ERROR|WORKER SAYS):|retrying|oc-worker: ERROR' | sed 's/^/        /'
-  printf '%s\n' "$out" | grep -q '^MODELS ANSWERED: opencode-go/deepseek-v4.1-flash$' && ok "model verified" || bad "model not verified"
+  printf '%s\n' "$out" | grep -q '^MODELS ANSWERED: opencode-go/deepseek-v4.1-flash (variant max)$' && ok "model verified" || bad "model not verified"
   (cd "$R" && npm test >/dev/null 2>&1) && ok "worker's change passes npm test" || bad "npm test fails after worker"
   owner_intact "$R" && ok "owner changes intact (live)" || bad "owner changes altered (live)"
   printf '%s\n' "$out" | grep -A3 '^FILES CHANGED BY WORKER' | grep -q notes.md && bad "worker touched notes.md" || ok "worker stayed in scope"

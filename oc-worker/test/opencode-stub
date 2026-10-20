@@ -4,7 +4,7 @@
 case "$1" in
   --version) echo "stub 0";;
   models) echo "opencode-go/deepseek-v4.1-flash";;
-  session) echo '{"info":{"model":{"providerID":"opencode-go","id":"'"${STUB_EXPORT_MODEL:-deepseek-v4.1-flash}"'"}}}';;
+  session) echo '{"info":{"model":{"providerID":"opencode-go","id":"'"${STUB_EXPORT_MODEL:-deepseek-v4.1-flash}"'","variant":"'"${STUB_EXPORT_VARIANT:-max}"'"}}}';;
   run)
     case "$STUB_MODE" in
       commit) echo x >> committed.txt; git add committed.txt; git -c user.email=s@s -c user.name=s commit -qm sneaky;;

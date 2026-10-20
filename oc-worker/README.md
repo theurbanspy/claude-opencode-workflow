@@ -109,6 +109,10 @@ The model id is **`opencode-go/deepseek-v4.1-flash`**. It is set in two places t
 `OC_WORKER_MODEL=<id>` overrides for a single run. The post-run check uses that id, so a typo
 fails loudly and never falls back to another model.
 
+### Reasoning effort
+
+The worker runs with the **highest reasoning variant, `max`** (`VARIANT=` in `oc-worker.sh`; `OC_WORKER_VARIANT=<v>` overrides one run). On OpenCode Go, `deepseek-v4.1-flash` accepts `default`, `low`, `high` and `max` (checked 2026-10-20; `medium` and `xhigh` are refused). The post-run check verifies the variant too: another variant answered → exit 6.
+
 ## Installation
 
 See the repository root README for the one-command install. Manually:

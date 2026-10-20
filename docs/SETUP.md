@@ -135,6 +135,16 @@ Edit both places, with the exact id shown by `opencode models`:
 
 Then run the live self-test (step 6). There is never a fallback model.
 
+### Reasoning effort
+
+The worker uses the highest reasoning variant, `max`, by default (`VARIANT=` in `~/.claude/oc-worker/oc-worker.sh`). Variants accepted by `deepseek-v4.1-flash` on OpenCode Go: `default`, `low`, `high`, `max`. To try one run with another variant:
+
+```bash
+OC_WORKER_VARIANT=high ~/.claude/oc-worker/oc-worker.sh --repo /path/to/repo --task task.md
+```
+
+If a variant is refused you get `Variant unavailable` (exit 4).
+
 ## Uninstall
 
 ```bash
