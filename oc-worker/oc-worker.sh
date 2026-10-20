@@ -70,6 +70,7 @@ case "$TIMEOUT" in ''|*[!0-9]*) die 2 "--timeout must be an integer (seconds)";;
 command -v "$OPENCODE_BIN" >/dev/null 2>&1 || die 3 "OpenCode CLI not found ('$OPENCODE_BIN')"
 command -v jq >/dev/null 2>&1 || die 3 "jq not found"
 command -v perl >/dev/null 2>&1 || die 3 "perl not found (used for the timeout)"
+command -v python3 >/dev/null 2>&1 || die 3 "python3 not found (used for the change snapshot)"
 [ -f "$CONFIG" ] || die 3 "worker config missing: $CONFIG"
 [ -f "$PREAMBLE" ] || die 3 "worker preamble missing: $PREAMBLE"
 [ -d "$REPO" ] || die 3 "repo not found: $REPO"
@@ -136,7 +137,9 @@ snapshot() { # $1 = prefix (pre|post)
   # Content hash of every dirty/untracked path, read from NUL-separated status (-z): no quoting,
   # no escaping, so unusual file names (spaces, unicode, "->") cannot dodge the checks.
   # Output: "<hash>  <path>" with the path JSON-escaped only if it contains a control character.
-  gsafe status --porcelain=v1 -z --untracked-files=all | python3 -c '
+  # python3 -I from /: isolated mode, no cwd/env on sys.path, so a module the worker plants in the
+  # repo (e.g. hashlib.py) can never be imported. Fails CLOSED: any error → SAFETY-VIOLATION.
+  if ! gsafe status --porcelain=v1 -z --untracked-files=all | ( cd / && python3 -I -c '
 import hashlib, json, os, sys
 repo = sys.argv[1]
 parts = sys.stdin.buffer.read().split(b"\0")
@@ -151,10 +154,18 @@ while i < len(parts):
 for p in sorted(paths):
     name = p.decode("utf-8", "surrogateescape")
     full = os.path.join(repo.encode(), p)
-    h = hashlib.sha1(open(full, "rb").read()).hexdigest() if os.path.isfile(full) else "deleted"
-    shown = json.dumps(name) if any(ord(c) < 32 for c in name) else name
+    try:
+        h = hashlib.sha1(open(full, "rb").read()).hexdigest() if os.path.isfile(full) else "deleted"
+    except OSError:
+        h = "unreadable"
+    if any(ord(c) < 32 or ord(c) == 127 for c in name):
+        sys.stderr.write("CONTROL-CHAR-PATH " + json.dumps(name) + "\n")
+        h = "control-char-path"
+    shown = json.dumps(name) if any(ord(c) < 32 or ord(c) == 127 for c in name) else name
     sys.stdout.write(f"{h}  {shown}\n")
-' "$REPO" > "$RUN/$1.hashes"
+' "$REPO" ) > "$RUN/$1.hashes" 2> "$RUN/$1.snapshot-err"; then
+    echo "snapshot failed" >> "$RUN/$1.snapshot-err"
+  fi
 }
 snapshot pre
 git_fingerprint() { # config, hooks, info, attributes — anything that can make git run code
@@ -288,6 +299,11 @@ SAFETY=""
 [ "$(cat "$RUN/pre.head")" = "$(cat "$RUN/post.head")" ] || SAFETY="${SAFETY}HEAD moved ($(cat "$RUN/pre.head") -> $(cat "$RUN/post.head")); "
 [ "$(cat "$RUN/pre.branch")" = "$(cat "$RUN/post.branch")" ] || SAFETY="${SAFETY}branch changed; "
 git_fingerprint > "$RUN/post.gitdir"
+for _ph in pre post; do
+  if [ -s "$RUN/$_ph.snapshot-err" ]; then
+    SAFETY="${SAFETY}$_ph-run change snapshot failed or found a control-character file name ($(head -c 200 "$RUN/$_ph.snapshot-err" | tr '\n' ' ')); "
+  fi
+done
 cmp -s "$RUN/pre.gitdir" "$RUN/post.gitdir" || SAFETY="${SAFETY}.git config/hooks/info changed (see pre.gitdir vs post.gitdir); "
 if [ -n "$SAFETY" ]; then STATUS="SAFETY-VIOLATION"; CODE=7; fi
 
@@ -299,7 +315,7 @@ TOUCHED_PREEXISTING="$(comm -12 <(printf '%s\n' "$CHANGED" | sed '/^$/d') <(prin
 printf '%s\n' "$CHANGED" | sed '/^$/d' > "$RUN/changed-files.txt"
 # Protected paths (case-insensitive: macOS filesystems are): the worker must never change the
 # orchestrator's rules, its own policy, CI/hooks, or secrets.
-PROTECTED="$(grep -iE '(^|/)(\.git/|\.claude/|claude\.md$|agents\.md$|scripts/oc-worker/|\.oc-runs/|\.husky/|\.github/|\.opencode/|opencode\.jsonc?$|\.githooks/|\.pre-commit-config\.ya?ml$|lefthook[^/]*$|\.lintstagedrc[^/]*$|\.envrc$|\.devcontainer/|\.vscode/|\.gitattributes$|\.gitmodules$)|(^|/)\.env' "$RUN/changed-files.txt" || true)"
+PROTECTED="$(grep -iE '(^\"?|/)(\.git/|\.claude/|claude\.md$|agents\.md$|scripts/oc-worker/|\.oc-runs/|\.husky/|\.github/|\.opencode/|opencode\.jsonc?$|\.githooks/|\.pre-commit-config\.ya?ml$|lefthook[^/]*$|\.lintstagedrc[^/]*$|\.envrc$|\.devcontainer/|\.vscode/|\.gitattributes$|\.gitmodules$)|(^|/)\.env' "$RUN/changed-files.txt" || true)"
 # Git-ignored paths (node_modules/, .vscode/, build output…) are invisible to the hash snapshot.
 # The worker cannot run code, so it has no legitimate reason to change any of them.
 IGNORED_CHANGED="$(cd "$REPO" && find . -path ./.git -prune -o -type f -newer "$RUN/.start-marker" -print 2>/dev/null \

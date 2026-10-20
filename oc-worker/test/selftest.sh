@@ -57,6 +57,10 @@ R=$(fresh qn); OC_WORKER_OPENCODE_BIN="$STUB" STUB_MODE=quoted "$W" --repo "$R" 
 R=$(fresh pc); OC_WORKER_OPENCODE_BIN="$STUB" STUB_MODE=precommit "$W" --repo "$R" --task "$TASK" --runs-dir "$RUNS" >/dev/null 2>&1; expect ".pre-commit-config.yaml planted → safety violation" 7 $?
 R=$(fresh hk); mkdir "$R/.githooks"; echo "#!/bin/sh" > "$R/.githooks/pre-commit"; git -C "$R" config core.hooksPath .githooks
 OC_WORKER_OPENCODE_BIN="$STUB" STUB_MODE=hookfile "$W" --repo "$R" --task "$TASK" --runs-dir "$RUNS" >/dev/null 2>&1; expect "hook under core.hooksPath edited → safety violation" 7 $?
+R=$(fresh ph); MARK="$T/hijack-mark"; rm -f "$MARK"
+( cd "$R" && HIJACK_MARK="$MARK" OC_WORKER_OPENCODE_BIN="$STUB" STUB_MODE=pyhijack "$W" --repo . --task "$TASK" --runs-dir "$RUNS" >/dev/null 2>&1 )
+[ -e "$MARK" ] && bad "planted hashlib.py was imported by the launcher" || ok "planted Python module never imported (python3 -I)"
+R=$(fresh cc); OC_WORKER_OPENCODE_BIN="$STUB" STUB_MODE=ctrlname "$W" --repo "$R" --task "$TASK" --runs-dir "$RUNS" >/dev/null 2>&1; expect "control character in a file name → safety violation" 7 $?
 R=$(fresh g); OC_WORKER_OPENCODE_BIN="$STUB" STUB_MODE=crash "$W" --repo "$R" --task "$TASK" --runs-dir "$RUNS" >/dev/null 2>&1; expect "worker crash" 5 $?
 R=$(fresh h); OC_WORKER_OPENCODE_BIN="$STUB" STUB_MODE=error "$W" --repo "$R" --task "$TASK" --runs-dir "$RUNS" >/dev/null 2>&1; expect "provider error (quota)" 4 $?
 R=$(fresh i); OC_WORKER_OPENCODE_BIN="$STUB" STUB_MODE=sleep "$W" --repo "$R" --task "$TASK" --runs-dir "$RUNS" --timeout 3 >/dev/null 2>&1; expect "wall-clock timeout" 124 $?

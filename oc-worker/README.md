@@ -78,6 +78,7 @@ The launcher adds its own guards:
 | Git-ignored files watched | Files under ignored paths (`node_modules/`, `.vscode/`, build output…) modified during the run → exit 7 (the worker can't run code, so it has no reason to touch them) |
 | Rule order matters | OpenCode applies the **last** matching rule: the shell policy is `*` deny, then the allows, then every deny pattern last, so `git diff -- .env` or `git diff -- x && touch y` stay denied |
 | Hooks & auto-run files | `core.hooksPath` and its folder are fingerprinted; edits to `.githooks/`, `.husky/`, `.pre-commit-config.yaml`, `lefthook*`, `.lintstagedrc*`, `.envrc`, `.devcontainer/`, `.vscode/` are denied and stop the run (exit 7). Changed paths are read from `git status -z`, so unusual file names can't dodge the checks |
+| Snapshot can't be hijacked, fails closed | The change snapshot runs `python3 -I` from `/` (a module planted in the repo, e.g. `hashlib.py`, is never imported); a snapshot error or a file name with a control character → exit 7 |
 | Protected paths | Any change to `.git/`, `.claude/`, `CLAUDE.md`, `AGENTS.md`, `.github/`, `.husky/`, `.opencode/`, `.env*` (case-insensitive) → exit 7 |
 | Timeout | Own process group, `TERM` then `KILL` for the whole tree. 60 s with no output → one retry (no model call was made), then exit 4 |
 | No secrets in logs | Nothing is printed from `auth.json`. Logs are scrubbed of `oc_sk_…`, `sk-…`, `lpr_…` patterns. The exported transcript is used for the model check and then deleted |
