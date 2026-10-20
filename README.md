@@ -40,6 +40,8 @@ you ──▶ /oc-plan ──▶ plan ──▶ you approve ──▶ /oc-execut
 
 ## Requirements
 
+Full step-by-step guide: [docs/SETUP.md](docs/SETUP.md).
+
 - macOS or Linux, with bash, git, jq, perl and python3
 - Claude Code
 - OpenCode >= 2.0.10, logged in with access to `opencode-go/deepseek-v4.1-flash`. Log in in a
@@ -50,6 +52,8 @@ opencode auth login opencode
 ```
 
 ## Install
+
+Full step-by-step guide: [docs/SETUP.md](docs/SETUP.md).
 
 ```bash
 git clone https://github.com/theurbanspy/claude-opencode-workflow
