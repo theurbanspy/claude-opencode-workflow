@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test double for oc-worker.sh (selftest.sh). STUB_MODE: commit | crash | sleep | error | gitcfg | protected | ignored | ocjson
+# Test double for oc-worker.sh (selftest.sh). STUB_MODE: commit | crash | sleep | error | gitcfg | protected | ignored | ocjson | quoted | precommit | hookfile
 # STUB_EXPORT_MODEL: model id reported by `session export` (default: the pinned one).
 case "$1" in
   --version) echo "stub 0";;
@@ -13,6 +13,9 @@ case "$1" in
       gitcfg) git config --local core.fsmonitor "touch /tmp/pwned";;
       protected) echo "# injected" >> CLAUDE.md;;
       ignored) mkdir -p node_modules/pkg && echo "module.exports=1" > node_modules/pkg/index.js;;
+      quoted) mkdir -p .claude && echo x > ".claude/évil file.md";;
+      precommit) echo "repos: []" > .pre-commit-config.yaml;;
+      hookfile) echo "echo pwned" >> .githooks/pre-commit;;
       ocjson) echo '{"plugin":["evil"]}' > opencode.json;;
       error) echo '{"type":"error","sessionID":"ses_stub","error":{"type":"provider.quota","message":"Go usage limit exceeded","status":429}}'; exit 1;;
     esac

@@ -132,20 +132,40 @@ mkdir -p "$RUN" || die 3 "cannot create run dir $RUN"
 snapshot() { # $1 = prefix (pre|post)
   gsafe rev-parse HEAD > "$RUN/$1.head" 2>/dev/null || echo "(no commits)" > "$RUN/$1.head"
   gsafe symbolic-ref -q --short HEAD > "$RUN/$1.branch" 2>/dev/null || echo "(detached)" > "$RUN/$1.branch"
-  gsafe status --porcelain=v1 --untracked-files=all > "$RUN/$1.status"
-  # content hash of every dirty/untracked path, to detect what the worker touched
-  : > "$RUN/$1.hashes"
-  sed -E 's/^.. //; s/.* -> //' "$RUN/$1.status" | sort -u | while IFS= read -r f; do
-    if [ -f "$REPO/$f" ]; then
-      printf '%s  %s\n' "$(gsafe hash-object -- "$f")" "$f"
-    else
-      printf '%s  %s\n' "deleted" "$f"
-    fi
-  done > "$RUN/$1.hashes"
+  gsafe status --porcelain=v1 --untracked-files=all > "$RUN/$1.status"   # human-readable copy only
+  # Content hash of every dirty/untracked path, read from NUL-separated status (-z): no quoting,
+  # no escaping, so unusual file names (spaces, unicode, "->") cannot dodge the checks.
+  # Output: "<hash>  <path>" with the path JSON-escaped only if it contains a control character.
+  gsafe status --porcelain=v1 -z --untracked-files=all | python3 -c '
+import hashlib, json, os, sys
+repo = sys.argv[1]
+parts = sys.stdin.buffer.read().split(b"\0")
+paths, i = set(), 0
+while i < len(parts):
+    e = parts[i]; i += 1
+    if len(e) < 4: continue
+    paths.add(e[3:])
+    if e[:1] in (b"R", b"C") or e[1:2] in (b"R", b"C"):
+        if i < len(parts) and parts[i]: paths.add(parts[i])
+        i += 1
+for p in sorted(paths):
+    name = p.decode("utf-8", "surrogateescape")
+    full = os.path.join(repo.encode(), p)
+    h = hashlib.sha1(open(full, "rb").read()).hexdigest() if os.path.isfile(full) else "deleted"
+    shown = json.dumps(name) if any(ord(c) < 32 for c in name) else name
+    sys.stdout.write(f"{h}  {shown}\n")
+' "$REPO" > "$RUN/$1.hashes"
 }
 snapshot pre
 git_fingerprint() { # config, hooks, info, attributes — anything that can make git run code
   ( cd "$GIT_DIR" && find config hooks info -type f 2>/dev/null | sort | xargs shasum 2>/dev/null )
+  # core.hooksPath may point inside the work tree (e.g. .githooks/): fingerprint that folder too.
+  local hp; hp="$(git -C "$REPO" config --get core.hooksPath 2>/dev/null || true)"
+  echo "hooksPath=$hp"
+  if [ -n "$hp" ]; then
+    case "$hp" in /*) ;; *) hp="$REPO/$hp" ;; esac
+    [ -d "$hp" ] && ( cd "$hp" && find . -type f | sort | xargs shasum 2>/dev/null )
+  fi
   shasum "$REPO/.gitattributes" "$REPO/.gitmodules" 2>/dev/null
 }
 git_fingerprint > "$RUN/pre.gitdir"
@@ -279,7 +299,7 @@ TOUCHED_PREEXISTING="$(comm -12 <(printf '%s\n' "$CHANGED" | sed '/^$/d') <(prin
 printf '%s\n' "$CHANGED" | sed '/^$/d' > "$RUN/changed-files.txt"
 # Protected paths (case-insensitive: macOS filesystems are): the worker must never change the
 # orchestrator's rules, its own policy, CI/hooks, or secrets.
-PROTECTED="$(grep -iE '(^|/)(\.git/|\.claude/|claude\.md$|agents\.md$|scripts/oc-worker/|\.oc-runs/|\.husky/|\.github/|\.opencode/|opencode\.jsonc?$|\.gitattributes$|\.gitmodules$)|(^|/)\.env' "$RUN/changed-files.txt" || true)"
+PROTECTED="$(grep -iE '(^|/)(\.git/|\.claude/|claude\.md$|agents\.md$|scripts/oc-worker/|\.oc-runs/|\.husky/|\.github/|\.opencode/|opencode\.jsonc?$|\.githooks/|\.pre-commit-config\.ya?ml$|lefthook[^/]*$|\.lintstagedrc[^/]*$|\.envrc$|\.devcontainer/|\.vscode/|\.gitattributes$|\.gitmodules$)|(^|/)\.env' "$RUN/changed-files.txt" || true)"
 # Git-ignored paths (node_modules/, .vscode/, build output…) are invisible to the hash snapshot.
 # The worker cannot run code, so it has no legitimate reason to change any of them.
 IGNORED_CHANGED="$(cd "$REPO" && find . -path ./.git -prune -o -type f -newer "$RUN/.start-marker" -print 2>/dev/null \
