@@ -31,6 +31,12 @@ specification; the worker's report is a claim. Evidence = the diff + checks Clau
 10. **Pre-existing changes.** Any file under "PRE-EXISTING DIRTY FILES THE WORKER ALSO CHANGED":
     compare with the run's `pre.patch`; the user's lines must be intact.
 
+13. **Cold second read (tasks on money, authorization or a restricted role only).** Claude wrote
+    the plan, so Claude tends to confirm its own spec. For these tasks, hand a read-only subagent
+    ONLY the relevant plan excerpt (§2 contracts, §4 invariants, the task), the diff and the Verify
+    output — no worker report, no review notes — and ask it to list deviations. Its findings go
+    through the normal correction flow. Skip it for ordinary tasks.
+
 Generated code compiling or tests passing is not proof the task is right; steps 2–8 are.
 
 ## Deviation classes → action

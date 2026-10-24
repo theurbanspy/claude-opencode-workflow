@@ -106,6 +106,11 @@ Rules that make DeepSeek reliable:
 - **Size for the worker's track record:** a task that is purely mechanical and fully specified
   (exact strings, exact call sites) can go up to the ≤ 5 files / ~150 lines limit — do not split
   it further for comfort. Keep tasks small only where judgment or subtle logic is involved.
+- **File size is a worker risk too:** cheaper models degrade on large files. A NEW file must be
+  planned ≤ ~500 lines (split the module in the plan, not in review). For an existing file of
+  more than ~800 lines, the requirement names the exact function/region (`path:start-end`) to
+  edit and the worker is told not to restructure the rest; extracting a big file is its own task
+  or Claude's own work.
 - **Attach context explicitly:** if the worker needs a doc outside its repo (e.g. a parent
   `AGENTS.md`), name it in the task's Requirements as "attached" and note it for `--context`.
 - **Risky steps are isolated:** migrations, dependency additions, config/CI changes are their own
