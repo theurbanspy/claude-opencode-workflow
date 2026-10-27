@@ -96,7 +96,9 @@ Rules that make DeepSeek reliable:
 - **Tests are specified as cases:** `input → expected` lines the worker must encode in the named
   test file. The worker writes them; Claude runs them (`Verify`).
 - **Verify is objective and scoped:** the exact command(s) Claude runs for that task, from §1's
-  inspection. Integration and regression checks go in §8.
+  inspection. Integration and regression checks go in §8. When the project has a linter or
+  formatter, its scoped command is part of every task's Verify: tools catch the worker's
+  stylistic drift (naming, import order, error-handling idiom) more reliably than a diff read.
 - **Guards ride along:** during §1 inspection, list the project's source/lint guard tests (tests
   that grep the source for forbidden tokens or regions, e.g. "no `DA` token inside the public
   routes block") and the regions they protect. Every task whose **Files** include a guarded file

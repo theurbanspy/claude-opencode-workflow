@@ -25,6 +25,11 @@ specification; the worker's report is a claim. Evidence = the diff + checks Clau
    (not just "does not throw"). Missing or weakened → deviation T (tests).
 8. **Quality.** Error handling, validation, typing, logging, security as required by the task
    and §6 → otherwise deviation Q.
+   Grep the diff for workarounds that hide a failure instead of fixing it: `@ts-ignore`,
+   `@ts-expect-error`, `as any`, `eslint-disable`, `# type: ignore`, `noqa`, an empty or
+   log-only `catch`/`except`, `.skip`/`.only`/`xit`, an assertion loosened from the task's
+   expected value, a branch that special-cases a test input → Q, and the correction asks for the
+   root fix (or a `PLAN ISSUES` report if the plan makes the root fix impossible).
 9. **Verify.** Run the task's Verify commands — type check first (the worker writes blind; typing
    slips are the most common first-pass failure). Then the §8 regression suites the task can affect.
    Capture output in a machine-readable form (TAP/JSON reporters) for repair prompts.

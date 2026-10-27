@@ -45,7 +45,8 @@ none
 ## 6 · Worker brief
 <!-- Prepended to EVERY task file. ≤ 40 lines. Imperative, no rationale. Only what every task
      needs: design in 3–5 lines, contracts shared across tasks, invariants, conventions,
-     reuse list. -->
+     reuse list. Always include this line:
+     - Never silence a type, lint or test error (ignore comments, `as any`, skipped tests, empty catch); report it as PLAN ISSUES. -->
 
 ## 7 · Tasks
 
